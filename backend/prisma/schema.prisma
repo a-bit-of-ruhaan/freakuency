@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String              @id @default(cuid())
+  spotifyId   String              @unique
+  email       String?
+  displayName String
+  avatarUrl   String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  credential  SpotifyCredential?
+  sessions    Session[]
+  playlists   Playlist[]
+  favorites   Favorite[]
+}
+
+model SpotifyCredential {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  encryptedAccessToken  String
+  encryptedRefreshToken String
+  accessTokenExpiresAt  DateTime
+  scopes                String
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model OAuthAttempt {
+  id           String   @id @default(cuid())
+  stateHash    String   @unique
+  codeVerifier String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Track {
+  id                       String        @id @default(cuid())
+  spotifyId                String?       @unique
+  musicBrainzRecordingId   String?       @unique
+  archiveIdentifier        String?
+  archiveFileName          String?
+  audioLicenseUrl          String?
+  title                    String
+  artist                   String
+  album                    String
+  imageUrl                 String?
+  durationMs               Int
+  previewUrl               String?
+  genres                   Json          @default("[]")
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  mediaAsset               MediaAsset?
+  playlistItems PlaylistItem[]
+  favorites   Favorite[]
+
+  @@index([title, artist])
+  @@unique([archiveIdentifier, archiveFileName])
+}
+
+model MediaAsset {
+  id                String   @id @default(cuid())
+  trackId           String   @unique
+  storageKey        String   @unique
+  mimeType          String
+  byteLength        BigInt
+  rightsHolder      String
+  licenseReference  String
+  licenseVerifiedAt DateTime
+  createdAt         DateTime @default(now())
+  track             Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+}
+
+model Playlist {
+  id          String         @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  isPublic    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       PlaylistItem[]
+
+  @@index([userId, updatedAt])
+}
+
+model PlaylistItem {
+  id         String   @id @default(cuid())
+  playlistId String
+  trackId    String
+  position   Int
+  addedAt    DateTime @default(now())
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, trackId])
+  @@unique([playlistId, position])
+}
+
+model Favorite {
+  userId    String
+  trackId   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@id([userId, trackId])
+}
